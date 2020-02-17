@@ -58,6 +58,9 @@
 
 #define NUM_OF_SENSORS 2
 
+// Peripheral uart service
+BLEUart bleuart_peripheral;
+
 // Struct containing peripheral info
 typedef struct
 {
@@ -118,15 +121,27 @@ void setup()
 
     // Config the peripheral connection with high bandwidth
     // Bluefruit.configPrphConn(35, BLE_GAP_EVENT_LENGTH_MIN, BLE_GATTS_HVN_TX_QUEUE_SIZE_DEFAULT, BLE_GATTC_WRITE_CMD_TX_QUEUE_SIZE_DEFAULT);
-    Bluefruit.configCentralBandwidth(BANDWIDTH_HIGH);
+    Bluefruit.configCentralBandwidth(BANDWIDTH_MAX);
     Bluefruit.configPrphBandwidth(BANDWIDTH_MAX);
 
     // Initialize Bluefruit with max concurrent connections as Peripheral = 0, Central = 4
     // SRAM usage required by SoftDevice will increase with number of connections
-    Bluefruit.begin(0, 1);
+    Bluefruit.begin(1, 1);
+    Bluefruit.setTxPower(4);    // Check bluefruit.h for supported values
 
     // Set Name
     Bluefruit.setName("Bluefruit52 Central");
+
+    // Callbacks for Peripheral
+    Bluefruit.Periph.setConnectCallback(prph_connect_callback);
+    Bluefruit.Periph.setDisconnectCallback(prph_disconnect_callback);
+
+    // Callbacks for Central
+    Bluefruit.Central.setConnectCallback(connect_callback_central);
+    Bluefruit.Central.setDisconnectCallback(disconnect_callback_central);
+
+    // Configure and Start BLE Uart Service for Peripheral
+    bleuart_peripheral.begin();
 
     // Init peripheral pool
     for (uint8_t idx=0; idx<BLE_MAX_CONNECTION; idx++)
@@ -138,10 +153,6 @@ void setup()
         prphs[idx].bleuart.begin();
         prphs[idx].bleuart.setRxCallback(bleuart_rx_callback_central);
     }
-
-    // Callbacks for Central
-    Bluefruit.Central.setConnectCallback(connect_callback_central);
-    Bluefruit.Central.setDisconnectCallback(disconnect_callback_central);
 
     /* Start Central Scanning
      * - Enable auto scan if disconnected
@@ -156,6 +167,9 @@ void setup()
     Bluefruit.Scanner.filterUuid(BLEUART_UUID_SERVICE);
     Bluefruit.Scanner.useActiveScan(false);             // Don't request scan response data
     Bluefruit.Scanner.start(0);                         // 0 = Don't stop scanning after n seconds
+
+    // Set up and start advertising
+    startAdv();
 
     /* Set up the IMU to output the rotation vector */
     // Wire.begin();
@@ -331,6 +345,7 @@ void loop()
             {
                 strcpy(ble_data_send, prph_data[NUM_OF_SENSORS-1].buf);
                 strcat(ble_data_send, prph_data[i].buf);
+                bleuart_peripheral.print(ble_data_send);
                 Serial.println(ble_data_send);
                 prph_data[i].data_received = false;
             }
@@ -388,4 +403,57 @@ void blink_timer_callback(TimerHandle_t xTimerID)
 
     count++;
     if (count >= 10) count = 0;
+}
+
+/* ***********************************************************
+Periperal
+************************************************************ */
+
+void startAdv(void)
+{
+    // Advertising packet
+    Bluefruit.Advertising.addFlags(BLE_GAP_ADV_FLAGS_LE_ONLY_GENERAL_DISC_MODE);
+    Bluefruit.Advertising.addTxPower();
+
+    // Include bleuart 128-bit uuid
+    Bluefruit.Advertising.addService(bleuart_peripheral);
+
+    // Secondary Scan Response packet (optional)
+    // Since there is no room for 'Name' in Advertising packet
+    Bluefruit.ScanResponse.addName();
+
+    /* Start Advertising
+    * - Enable auto advertising if disconnected
+    * - Interval:  fast mode = 20 ms, slow mode = 152.5 ms
+    * - Timeout for fast mode is 30 seconds
+    * - Start(timeout) with timeout = 0 will advertise forever (until connected)
+    *
+    * For recommended advertising interval
+    * https://developer.apple.com/library/content/qa/qa1931/_index.html
+    */
+    Bluefruit.Advertising.restartOnDisconnect(true);
+    Bluefruit.Advertising.setInterval(32, 244);    // in unit of 0.625 ms
+    Bluefruit.Advertising.setFastTimeout(30);      // number of seconds in fast mode
+    Bluefruit.Advertising.start(0);                // 0 = Don't stop advertising after n seconds
+}
+
+void prph_connect_callback(uint16_t conn_handle)
+{
+    // Get the reference to current connection
+    BLEConnection* connection = Bluefruit.Connection(conn_handle);
+
+    char peer_name[32] = { 0 };
+    connection->getPeerName(peer_name, sizeof(peer_name));
+
+    Serial.print("[Prph] Connected to ");
+    Serial.println(peer_name);
+}
+
+void prph_disconnect_callback(uint16_t conn_handle, uint8_t reason)
+{
+    (void) conn_handle;
+    (void) reason;
+
+    Serial.println();
+    Serial.println("[Prph] Disconnected");
 }
