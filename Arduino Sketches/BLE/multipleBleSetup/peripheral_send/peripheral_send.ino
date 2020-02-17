@@ -48,23 +48,23 @@ void setup()
     Bluefruit.Periph.setDisconnectCallback(disconnect_callback);
 
     // To be consistent OTA DFU should be added first if it exists
-    bledfu.begin();
-    Serial.println("Began OTA DFU Service");
+    // bledfu.begin();
+    // Serial.println("Began OTA DFU Service");
 
     // Configure and Start Device Information Service
-    bledis.setManufacturer("Adafruit Industries");
-    bledis.setModel("Bluefruit Feather52");
-    bledis.begin();
-    Serial.println("Began Device Information Service");
+    // bledis.setManufacturer("Adafruit Industries");
+    // bledis.setModel("Bluefruit Feather52");
+    // bledis.begin();
+    // Serial.println("Began Device Information Service");
 
     // Configure and Start BLE Uart Service
     bleuart.begin();
     Serial.println("Began BLE UART Service");
 
     // Start BLE Battery Service
-    blebas.begin();
-    blebas.write(100);
-    Serial.println("Began BLE Battery Service");
+    // blebas.begin();
+    // blebas.write(100);
+    // Serial.println("Began BLE Battery Service");
 
     // Set up and start advertising
     startAdv();
@@ -117,22 +117,15 @@ void loop()
 {
     // if (myIMU.dataAvailable() == true)
     // {
-        quaternion[0] = 0.99;
-        quaternion[1] = -0.12;
-        quaternion[2] = 0.42;
-        quaternion[3] = 0.73;
+        char buf[48];
+        quaternion[0] = 0.239013671875000;
+        quaternion[1] = -0.648071289062500;
+        quaternion[2] = -0.274291992187500;
+        quaternion[3] = -0.669067382812500;
 
-        String temp = "";
-        temp += quaternion[0];
-        temp += ",";
-        temp += quaternion[1];
-        temp += ",";
-        temp += quaternion[2];
-        temp += ",";
-        temp += quaternion[3];
-        temp += ",";
+        snprintf(buf, sizeof(buf), "%.8f,%.8f,%.8f,%.8f,", quaternion[0], quaternion[1],quaternion[2], quaternion[3]);
 
-        bleuart.print(temp);
+        bleuart.print(buf);
     // }
 }
 

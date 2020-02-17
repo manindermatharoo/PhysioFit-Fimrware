@@ -72,7 +72,7 @@ typedef struct
 /* Struct containing the data for a peripheral */
 typedef struct
 {
-    char buf[26];
+    char buf[48];
     bool data_received;
 } prph_data_t;
 
@@ -91,7 +91,7 @@ prph_info_t prphs[BLE_MAX_CONNECTION];
 
 prph_data_t prph_data[NUM_OF_SENSORS];
 
-char ble_data_send[26 * NUM_OF_SENSORS];
+char ble_data_send[48 * NUM_OF_SENSORS];
 
 // Software Timer for blinking the RED LED
 SoftwareTimer blinkTimer;
@@ -117,8 +117,9 @@ void setup()
     Serial.println("-----------------------------------------\n");
 
     // Config the peripheral connection with high bandwidth
-    Bluefruit.configPrphBandwidth(BANDWIDTH_HIGH);
+    // Bluefruit.configPrphConn(35, BLE_GAP_EVENT_LENGTH_MIN, BLE_GATTS_HVN_TX_QUEUE_SIZE_DEFAULT, BLE_GATTC_WRITE_CMD_TX_QUEUE_SIZE_DEFAULT);
     Bluefruit.configCentralBandwidth(BANDWIDTH_HIGH);
+    Bluefruit.configPrphBandwidth(BANDWIDTH_MAX);
 
     // Initialize Bluefruit with max concurrent connections as Peripheral = 0, Central = 4
     // SRAM usage required by SoftDevice will increase with number of connections
@@ -283,6 +284,7 @@ void bleuart_rx_callback_central(BLEClientUart& uart_svc)
     {
         memset(prph_data[id].buf, 0, sizeof(prph_data[id].buf)-1);
         uart_svc.read(prph_data[id].buf,sizeof(prph_data[id].buf)-1);
+        // Serial.println(prph_data[id].buf);
         prph_data[id].data_received = true;
     }
 }
@@ -311,23 +313,17 @@ void loop()
     // First check if we are connected to any peripherals
     if (Bluefruit.Central.connected() && connection_num == 1 /*&& myIMU.dataAvailable() == true*/)
     {
-        quaternion[0] = 0.43;
-        quaternion[1] = 0.23;
-        quaternion[2] = 0.94;
-        quaternion[3] = -0.34;
+        char temp[48];
 
-        String temp = "";
-        temp += quaternion[0];
-        temp += ",";
-        temp += quaternion[1];
-        temp += ",";
-        temp += quaternion[2];
-        temp += ",";
-        temp += quaternion[3];
-        temp += ",";
+        quaternion[0] = 0.296997070312500;
+        quaternion[1] = 0.250671386718750;
+        quaternion[2] = 0.652587890625000;
+        quaternion[3] = 0.650451660156250;
+
+        snprintf(temp, sizeof(temp), "%.8f,%.8f,%.8f,%.8f,", quaternion[0], quaternion[1],quaternion[2], quaternion[3]);
 
         memset(prph_data[NUM_OF_SENSORS-1].buf, 0, sizeof(prph_data[NUM_OF_SENSORS-1].buf));
-        strcpy(prph_data[NUM_OF_SENSORS-1].buf, temp.c_str());
+        strcpy(prph_data[NUM_OF_SENSORS-1].buf, temp);
 
         for(int i = 0; i < NUM_OF_SENSORS - 1; i++)
         {
