@@ -18,11 +18,10 @@
 #include <Wire.h>
 #include "SparkFun_BNO080_Arduino_Library.h"
 
+// #define IMU_CONNECTED
+
 // BLE Service
-BLEDfu  bledfu;    // OTA DFU service
-BLEDis  bledis;    // device information
 BLEUart bleuart;   // uart over ble
-BLEBas  blebas;    // battery
 
 /* IMU Setup */
 BNO080 myIMU;
@@ -32,9 +31,6 @@ void setup()
 {
     Serial.begin(115200);
     while ( !Serial ) delay(10);     // for nrf52840 with native usb
-
-    Serial.println("Bluefruit52 BLEUART Example");
-    Serial.println("---------------------------\n");
 
     /* This configures a higher MTU size of 128 bytes */
     Bluefruit.configPrphBandwidth(BANDWIDTH_HIGH);
@@ -47,42 +43,33 @@ void setup()
     Bluefruit.Periph.setConnectCallback(connect_callback);
     Bluefruit.Periph.setDisconnectCallback(disconnect_callback);
 
-    // To be consistent OTA DFU should be added first if it exists
-    // bledfu.begin();
-    // Serial.println("Began OTA DFU Service");
-
-    // Configure and Start Device Information Service
-    // bledis.setManufacturer("Adafruit Industries");
-    // bledis.setModel("Bluefruit Feather52");
-    // bledis.begin();
-    // Serial.println("Began Device Information Service");
-
     // Configure and Start BLE Uart Service
     bleuart.begin();
     Serial.println("Began BLE UART Service");
 
-    // Start BLE Battery Service
-    // blebas.begin();
-    // blebas.write(100);
-    // Serial.println("Began BLE Battery Service");
-
     // Set up and start advertising
     startAdv();
 
+#ifdef IMU_CONNECTED
     /* Set up the IMU to output the rotation vector */
-    // Wire.begin();
+    Wire.begin();
 
-    // if (myIMU.begin() == false)
-    // {
-    //     Serial.println("BNO080 not detected at default I2C address. Check your jumpers and the hookup guide. Freezing...");
-    //     while(1);
-    // }
+    if (myIMU.begin() == false)
+    {
+        Serial.println("BNO080 not detected at default I2C address. Check your jumpers and the hookup guide. Freezing...");
+        while(1);
+    }
 
-    // Wire.setClock(400000); //Increase I2C data rate to 400kHz
+    Wire.setClock(400000); //Increase I2C data rate to 400kHz
 
-    // myIMU.enableRotationVector(10); //Send data update every 10ms
+    myIMU.enableRotationVector(10); //Send data update every 10ms
 
-    // Serial.println(F("Rotation vector enabled"));
+    Serial.println(F("Rotation vector enabled"));
+
+#else
+    Serial.println("IMU not connected");
+
+#endif
 }
 
 void startAdv(void)
@@ -115,18 +102,28 @@ void startAdv(void)
 
 void loop()
 {
-    // if (myIMU.dataAvailable() == true)
-    // {
-        char buf[48];
-        quaternion[0] = 0.239013671875000;
-        quaternion[1] = -0.648071289062500;
-        quaternion[2] = -0.274291992187500;
-        quaternion[3] = -0.669067382812500;
+    char buf[48];
 
+#ifdef IMU_CONNECTED
+    if (myIMU.dataAvailable() == true)
+    {
+        quaternion[0] = myIMU.getQuatReal();
+        quaternion[1] = myIMU.getQuatI();
+        quaternion[2] = myIMU.getQuatJ();
+        quaternion[3] = myIMU.getQuatK();
+    }
+#else
+    quaternion[0] = 0.239013671875000;
+    quaternion[1] = -0.648071289062500;
+    quaternion[2] = -0.274291992187500;
+    quaternion[3] = -0.669067382812500;
+#endif
+
+    if(Bluefruit.connected())
+    {
         snprintf(buf, sizeof(buf), "%.8f,%.8f,%.8f,%.8f,", quaternion[0], quaternion[1],quaternion[2], quaternion[3]);
-
         bleuart.print(buf);
-    // }
+    }
 }
 
 /**
